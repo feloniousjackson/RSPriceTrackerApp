@@ -1,0 +1,97 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>RuneScape Price Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { background: #121212; color: #e0e0e0; font-family: sans-serif; padding: 1em; }
+    h1 { color: #00ffcc; }
+    input, button { margin: 0.5em; padding: 0.5em; }
+    .item-row { display: flex; gap: 1em; border-bottom: 1px solid #333; padding: 0.5em 0; }
+    .item-row span { min-width: 140px; word-break: break-word; }
+    .up { color: #00ff00; }
+    .down { color: #ff3333; }
+    .equal { color: #cc66ff; }
+  </style>
+</head>
+<body>
+  <h1>RuneScape Price Tracker</h1>
+  <input id="itemIdInput" type="number" placeholder="Enter Item ID">
+  <button onclick="addItem()">Add Item</button>
+  <button onclick="clearItems()">Clear All</button>
+  <div id="items"></div>
+
+  <script>
+    const API_URL = "https://prices.runescape.wiki/api/v1/osrs/latest";
+    let trackedItems = [];
+
+    function formatNum(n) {
+      return n.toLocaleString("en-US");
+    }
+
+    function getArrow(change) {
+      if (change > 0) return '<span class="up">▲</span>';
+      if (change < 0) return '<span class="down">▼</span>';
+      return '<span class="equal">=</span>';
+    }
+
+    function renderItems(data) {
+      const container = document.getElementById("items");
+      container.innerHTML = "";
+      trackedItems.forEach(item => {
+        const priceData = data[item.id];
+        if (!priceData) return;
+
+        const current = priceData.high;
+        const prev = item.prev || current;
+        const diff = current - prev;
+
+        const row = document.createElement("div");
+        row.className = "item-row";
+        row.innerHTML = `
+          <span>${item.name}</span>
+          <span>${getArrow(diff)}</span>
+          <span>Previous: ${formatNum(prev)}</span>
+          <span>Current: ${formatNum(current)}</span>
+          <span>Change: ${formatNum(diff)}</span>
+          <button onclick="removeItem(${item.id})">Remove</button>
+        `;
+        container.appendChild(row);
+        item.prev = current;
+      });
+    }
+
+    async function fetchPrices() {
+      try {
+        const res = await fetch(API_URL);
+        const json = await res.json();
+        renderItems(json.data);
+      } catch (e) {
+        console.error("API error", e);
+      }
+    }
+
+    function addItem() {
+      const id = parseInt(document.getElementById("itemIdInput").value);
+      if (!id || trackedItems.find(i => i.id === id)) return;
+      trackedItems.push({ id, name: "Item " + id, prev: null });
+      fetchPrices();
+    }
+
+    function removeItem(id) {
+      trackedItems = trackedItems.filter(i => i.id !== id);
+      fetchPrices();
+    }
+
+    function clearItems() {
+      trackedItems = [];
+      document.getElementById("items").innerHTML = "";
+    }
+
+    fetchPrices();
+    setInterval(fetchPrices, 60000); // 1-minute refresh
+  </script>
+</body>
+</html>
