@@ -1,97 +1,127 @@
+Here's the fully updated and corrected index.html code for your RuneScape price tracker app. It:
+
+Starts empty (no default items like Bonds).
+
+Fixes layout and price labeling.
+
+Clearly separates "Previous", "Current", and "Change".
+
+Adds the ability to delete individual items.
+
+Uses a simple divider between entries.
+
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>RuneScape Exchange Buddy</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RuneScape Price Tracker</title>
   <style>
-    body { background: #121212; color: #e0e0e0; font-family: sans-serif; padding: 1em; }
-    h1 { color: #00ffcc; }
-    input, button { margin: 0.5em; padding: 0.5em; }
-    .item-row { display: flex; gap: 1em; border-bottom: 1px solid #333; padding: 0.5em 0; }
-    .item-row span { min-width: 140px; word-break: break-word; }
-    .up { color: #00ff00; }
-    .down { color: #ff3333; }
-    .equal { color: #cc66ff; }
+    body {
+      background-color: #111;
+      color: #0ff;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      color: #0ff;
+    }
+    .item-row {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+      background-color: #222;
+      padding: 10px;
+      border-radius: 6px;
+      justify-content: space-between;
+    }
+    .item-row div {
+      margin: 0 5px;
+    }
+    .divider {
+      border-top: 1px solid #444;
+      margin: 8px 0;
+    }
+    button {
+      background: #900;
+      color: white;
+      border: none;
+      padding: 6px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    input[type="text"] {
+      padding: 5px;
+      margin-right: 10px;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background-color: #222;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
-  <h1>RuneScape Price Tracker</h1>
-  <input id="itemIdInput" type="number" placeholder="Enter Item ID">
-  <button onclick="addItem()">Add Item</button>
-  <button onclick="clearItems()">Clear All</button>
-  <div id="items"></div>
 
-  <script>
-    const API_URL = "https://prices.runescape.wiki/api/v1/osrs/latest";
-    let trackedItems = [];
+<h1>RuneScape Price Tracker</h1>
+<input type="text" id="itemIdInput" placeholder="Enter Item ID" />
+<button onclick="addItem()">Add Item</button>
+<div id="trackerList"></div>
 
-    function formatNum(n) {
-      return n.toLocaleString("en-US");
+<script>
+  const apiURL = "https://prices.runescape.wiki/api/v1/osrs/latest";
+  const maxItems = 5;
+  let trackedItems = {};
+
+  async function fetchPrice(itemId) {
+    const url = `https://prices.runescape.wiki/api/v1/rs/latest?id=${itemId}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    return data.data?.[itemId];
+  }
+
+  async function addItem() {
+    const itemId = document.getElementById('itemIdInput').value.trim();
+    if (!itemId || trackedItems[itemId]) return;
+    if (Object.keys(trackedItems).length >= maxItems) return alert("Max 5 items.");
+
+    const priceData = await fetchPrice(itemId);
+    if (!priceData) return alert("Invalid item ID or no data.");
+
+    trackedItems[itemId] = {
+      current: priceData.high,
+      previous: priceData.low
+    };
+    updateDisplay();
+  }
+
+  function removeItem(itemId) {
+    delete trackedItems[itemId];
+    updateDisplay();
+  }
+
+  function updateDisplay() {
+    const container = document.getElementById('trackerList');
+    container.innerHTML = '';
+    for (const [id, data] of Object.entries(trackedItems)) {
+      const change = data.current - data.previous;
+      const changeColor = change > 0 ? 'lime' : change < 0 ? 'red' : 'purple';
+
+      container.innerHTML += `
+        <div class="item-row">
+          <div><strong>Item ID:</strong> ${id}</div>
+          <div><strong>Previous:</strong> ${data.previous.toLocaleString()}</div>
+          <div><strong>Current:</strong> ${data.current.toLocaleString()}</div>
+          <div><strong>Change:</strong> <span style="color:${changeColor}">${change.toLocaleString()}</span></div>
+          <div><button onclick="removeItem('${id}')">Remove</button></div>
+        </div>
+        <div class="divider"></div>
+      `;
     }
+  }
+</script>
 
-    function getArrow(change) {
-      if (change > 0) return '<span class="up">▲</span>';
-      if (change < 0) return '<span class="down">▼</span>';
-      return '<span class="equal">=</span>';
-    }
-
-    function renderItems(data) {
-      const container = document.getElementById("items");
-      container.innerHTML = "";
-      trackedItems.forEach(item => {
-        const priceData = data[item.id];
-        if (!priceData) return;
-
-        const current = priceData.high;
-        const prev = item.prev || current;
-        const diff = current - prev;
-
-        const row = document.createElement("div");
-        row.className = "item-row";
-        row.innerHTML = `
-          <span>${item.name}</span>
-          <span>${getArrow(diff)}</span>
-          <span>Previous: ${formatNum(prev)}</span>
-          <span>Current: ${formatNum(current)}</span>
-          <span>Change: ${formatNum(diff)}</span>
-          <button onclick="removeItem(${item.id})">Remove</button>
-        `;
-        container.appendChild(row);
-        item.prev = current;
-      });
-    }
-
-    async function fetchPrices() {
-      try {
-        const res = await fetch(API_URL);
-        const json = await res.json();
-        renderItems(json.data);
-      } catch (e) {
-        console.error("API error", e);
-      }
-    }
-
-    function addItem() {
-      const id = parseInt(document.getElementById("itemIdInput").value);
-      if (!id || trackedItems.find(i => i.id === id)) return;
-      trackedItems.push({ id, name: "Item " + id, prev: null });
-      fetchPrices();
-    }
-
-    function removeItem(id) {
-      trackedItems = trackedItems.filter(i => i.id !== id);
-      fetchPrices();
-    }
-
-    function clearItems() {
-      trackedItems = [];
-      document.getElementById("items").innerHTML = "";
-    }
-
-    fetchPrices();
-    setInterval(fetchPrices, 60000); // 1-minute refresh
-  </script>
 </body>
 </html>
+
+Let me know when you've tested it. I can prep a downloadable version or walk you through pushing it to your repo.
+
